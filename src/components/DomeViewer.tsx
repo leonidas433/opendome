@@ -18,7 +18,7 @@ interface DomeViewerProps {
 // We scale the section (preserving the thickness:width ratio) so the wide
 // face / narrow face / end face are all clearly differentiated. Length and
 // position of each beam remain faithful to the geodesic calculation.
-const BEAM_VISUAL_SCALE = 2.5;
+const BEAM_VISUAL_SCALE = 1.8;
 
 function darkenColor(hex: number, factor: number): number {
   const r = Math.floor(((hex >> 16) & 0xff) * factor);
@@ -286,9 +286,7 @@ export default function DomeViewer({
 
     const group = s.group;
 
-    // 1) Clear previous beams. Dispose each unique material at most once
-    //    because the matCache shares the same 6-array reference across all
-    //    beams of the same strut type.
+    // ── 1. Limpiar geometrías anteriores ──────────────────────────────────────
     const disposedMats = new WeakSet<import('three').Material>();
     while (group.children.length) {
       const child = group.children.pop()!;
@@ -300,34 +298,24 @@ export default function DomeViewer({
         | undefined;
       if (Array.isArray(mat)) {
         for (const m of mat) {
-          if (!disposedMats.has(m)) {
-            m.dispose();
-            disposedMats.add(m);
-          }
+          if (!disposedMats.has(m)) { m.dispose(); disposedMats.add(m); }
         }
-      } else if (mat) {
-        if (!disposedMats.has(mat)) {
-          mat.dispose();
-          disposedMats.add(mat);
-        }
+      } else if (mat && !disposedMats.has(mat)) {
+        mat.dispose(); disposedMats.add(mat);
       }
     }
 
-    // Clear grid (we re-add it sized to current radius).
     const toRemove: import('three').Object3D[] = [];
-    s.scene.traverse((obj) => {
-      if (obj.userData.isGrid) toRemove.push(obj);
-    });
-    toRemove.forEach((o) => s.scene!.remove(o));
+    s.scene.traverse(obj => { if (obj.userData.isGrid) toRemove.push(obj); });
+    toRemove.forEach(o => s.scene!.remove(o));
 
     if (!vertices.length || !struts.length) return;
 
-    // Geodesic frame is z-up. Three.js convention is y-up. Map (x, y, z)_geo
-    // to (x, z, y)_three so the dome's pole points up the screen.
-    // Real dimensions in meters, scaled visually to make the cross-section
-    // distinguishable at typical dome viewing distances.
+    // ── 2. Coordenadas en espacio Three.js (z-up → y-up) ─────────────────────
     const beamW = (beamWidth / 1000) * BEAM_VISUAL_SCALE;
     const beamT = (beamThickness / 1000) * BEAM_VISUAL_SCALE;
+    const hw = beamW / 2;
+    const ht = beamT / 2;
 
     const toV3 = (v: Vertex) =>
       new THREE.Vector3(v.pos.x * radius, v.pos.z * radius, v.pos.y * radius);
@@ -335,33 +323,45 @@ export default function DomeViewer({
     const positions = vertices.map(toV3);
 
     let minY = Infinity;
-    for (const p of positions) {
-      if (p.y < minY) minY = p.y;
+    for (const p of positions) { if (p.y < minY) minY = p.y; }
+
+    // ── 3. Mapa de adyacencia: vertex_id → [{strutId, dir FROM vertex}] ───────
+    interface AdjEntry { strutId: number; dir: import('three').Vector3; }
+    const vertexAdj = new Map<number, AdjEntry[]>();
+
+    for (const strut of struts) {
+      const p1 = positions[strut.v1];
+      const p2 = positions[strut.v2];
+      const d = p2.clone().sub(p1).normalize();
+
+      const a1 = vertexAdj.get(strut.v1) ?? [];
+      a1.push({ strutId: strut.id, dir: d.clone() });
+      vertexAdj.set(strut.v1, a1);
+
+      const a2 = vertexAdj.get(strut.v2) ?? [];
+      a2.push({ strutId: strut.id, dir: d.clone().negate() });
+      vertexAdj.set(strut.v2, a2);
     }
 
-    // Lookup de ángulo de inglete por (strutType, nodeType). El nodeType se
-    // deriva de la valencia igual que en el motor (cutAngles.ts), así que las
-    // claves casan con las que generó computeDome.
-    function nodeTypeFromValence(valence: number): string {
-      if (valence === 5) return 'pentagonal';
-      if (valence === 6) return 'hexagonal';
-      return `boundary-${valence}`;
+    // ── 4. Helper: calcular trim en un extremo ────────────────────────────────
+    function computeTrim(
+      strutDir: import('three').Vector3,
+      adjEntries: AdjEntry[],
+      halfThickness: number,
+      maxTrim: number
+    ): number {
+      let best = 0;
+      for (const { dir: adjDir } of adjEntries) {
+        const cosA = Math.abs(strutDir.dot(adjDir));
+        const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+        if (sinA < 0.05) continue; // barras casi paralelas: skip
+        const t = halfThickness / sinA;
+        if (t > best) best = t;
+      }
+      return Math.min(best, maxTrim);
     }
 
-    const cutMap = new Map<string, number>(); // key → miter en GRADOS
-    for (const cut of nodeCuts) {
-      const key = `${cut.strutType}_${cut.nodeType}`;
-      if (!cutMap.has(key)) cutMap.set(key, cut.miter);
-    }
-
-    function getMiter(strutType: string, valence: number): number {
-      const key = `${strutType}_${nodeTypeFromValence(valence)}`;
-      return cutMap.get(key) ?? 0;
-    }
-
-    // Normal de cara promedio por arista (en espacio Three.js, tras toV3).
-    // Reemplaza la aproximación outward = mid.normalize() en la rotación
-    // secundaria por la normal real de las caras adyacentes al strut.
+    // ── 5. Normales de cara promedio por arista ────────────────────────────────
     function edgeKey(a: number, b: number): string {
       return a < b ? `${a}-${b}` : `${b}-${a}`;
     }
@@ -374,24 +374,17 @@ export default function DomeViewer({
       const pC = positions[c];
       if (!pA || !pB || !pC) continue;
 
-      // Normal de la cara en espacio Three.js.
-      const ab = pB.clone().sub(pA);
-      const ac = pC.clone().sub(pA);
-      const n = new THREE.Vector3().crossVectors(ab, ac).normalize();
-
-      // Asegurar que apunta hacia fuera (dot con centroide > 0).
+      const n = new THREE.Vector3()
+        .crossVectors(pB.clone().sub(pA), pC.clone().sub(pA))
+        .normalize();
       const centroid = pA.clone().add(pB).add(pC).multiplyScalar(1 / 3);
       if (n.dot(centroid) < 0) n.negate();
 
-      // Acumular para las 3 aristas de la cara.
       for (const [u, v] of [[a, b], [b, c], [c, a]] as [number, number][]) {
         const k = edgeKey(u, v);
-        const existing = faceNormalAccum.get(k);
-        if (existing) {
-          existing.add(n);
-        } else {
-          faceNormalAccum.set(k, n.clone());
-        }
+        const acc = faceNormalAccum.get(k);
+        if (acc) acc.add(n);
+        else faceNormalAccum.set(k, n.clone());
       }
     }
 
@@ -400,11 +393,28 @@ export default function DomeViewer({
       edgeFaceNormal.set(k, acc.normalize());
     }
 
-    // Per-type material cache: store the FULL 6-element array so the Mesh
-    // receives it directly, in the face order used by createMiterBeamGeometry.
+    // ── 6. Lookup de inglete ───────────────────────────────────────────────────
+    function nodeTypeFromValence(valence: number): string {
+      if (valence === 5) return 'pentagonal';
+      if (valence === 6) return 'hexagonal';
+      return `boundary-${valence}`;
+    }
+
+    const cutMap = new Map<string, number>();
+    for (const cut of nodeCuts) {
+      const key = `${cut.strutType}_${cut.nodeType}`;
+      if (!cutMap.has(key)) cutMap.set(key, cut.miter);
+    }
+
+    function getMiter(strutType: string, valence: number): number {
+      return cutMap.get(`${strutType}_${nodeTypeFromValence(valence)}`) ?? 0;
+    }
+
+    // ── 7. Cache de materiales ────────────────────────────────────────────────
     const matCache = new Map<string, import('three').MeshPhongMaterial[]>();
     const yAxis = new THREE.Vector3(0, 1, 0);
 
+    // ── 8. Bucle principal de barras ──────────────────────────────────────────
     for (const strut of struts) {
       const v1 = vertices[strut.v1];
       const v2 = vertices[strut.v2];
@@ -412,39 +422,49 @@ export default function DomeViewer({
 
       const p1 = positions[strut.v1];
       const p2 = positions[strut.v2];
-      const len = p1.distanceTo(p2);
-      if (len === 0) continue;
+      const fullLen = p1.distanceTo(p2);
+      if (fullLen === 0) continue;
 
-      const mid = p1.clone().add(p2).multiplyScalar(0.5);
       const dir = p2.clone().sub(p1).normalize();
+      const maxTrimPerEnd = fullLen * 0.4;
 
-      // Ángulos de inglete en cada extremo.
-      const miterBot = getMiter(strut.type, v1.valence); // extremo v1 (bottom)
-      const miterTop = getMiter(strut.type, v2.valence); // extremo v2 (top)
+      // Adyacentes en cada extremo (excluir la barra actual)
+      const adj1 = (vertexAdj.get(strut.v1) ?? []).filter(a => a.strutId !== strut.id);
+      const adj2 = (vertexAdj.get(strut.v2) ?? []).filter(a => a.strutId !== strut.id);
 
-      // Geometría con cortes reales.
-      const geo = createMiterBeamGeometry(len, beamW, beamT, miterTop, miterBot, THREE);
+      // Trim en cada extremo
+      const trim1 = computeTrim(dir, adj1, ht, maxTrimPerEnd);
+      const trim2 = computeTrim(dir.clone().negate(), adj2, ht, maxTrimPerEnd);
 
-      // Materiales (mismo sistema que antes).
+      // Extremos efectivos (acortados)
+      const p1Eff = p1.clone().addScaledVector(dir, trim1);
+      const p2Eff = p2.clone().addScaledVector(dir, -trim2);
+      const lenEff = Math.max(0.001, p1Eff.distanceTo(p2Eff));
+      const midEff = p1Eff.clone().add(p2Eff).multiplyScalar(0.5);
+
+      // Ángulos de inglete en cada extremo
+      const miterBot = getMiter(strut.type, v1.valence);
+      const miterTop = getMiter(strut.type, v2.valence);
+
+      // Geometría con cortes reales + longitud efectiva
+      const geo = createMiterBeamGeometry(lenEff, beamW, beamT, miterTop, miterBot, THREE);
+
+      // Materiales
       let mats = matCache.get(strut.type);
       if (!mats) {
         const hex = STRUT_COLORS_THREE[strut.type] ?? STRUT_COLOR_FALLBACK_THREE;
-        const matWide = new THREE.MeshPhongMaterial({ color: hex, shininess: 30 });
-        const matNarrow = new THREE.MeshPhongMaterial({
-          color: darkenColor(hex, 0.4),
-          shininess: 10,
-        });
-        const matEnd = new THREE.MeshPhongMaterial({ color: 0x0d1a0f, shininess: 5 });
+        const matWide   = new THREE.MeshPhongMaterial({ color: hex, shininess: 40 });
+        const matNarrow = new THREE.MeshPhongMaterial({ color: darkenColor(hex, 0.45), shininess: 15 });
+        const matEnd    = new THREE.MeshPhongMaterial({ color: 0x0d1a0f, shininess: 5 });
         // Orden: [+X narrow, -X narrow, top end, bot end, +Z wide, -Z wide]
         mats = [matNarrow, matNarrow, matEnd, matEnd, matWide, matWide];
         matCache.set(strut.type, mats);
       }
 
       const beam = new THREE.Mesh(geo, mats);
-      beam.position.copy(mid);
+      beam.position.copy(midEff);
 
-      // Rotación primaria: alinear eje Y local con dirección del strut.
-      // setFromUnitVectors falla si los vectores son antiparalelos — se trata.
+      // Rotación primaria: alinear Y local con dirección del strut
       const dotDir = dir.dot(yAxis);
       if (Math.abs(dotDir) < 0.999) {
         beam.quaternion.setFromUnitVectors(yAxis, dir);
@@ -452,11 +472,11 @@ export default function DomeViewer({
         beam.rotation.z = Math.PI;
       }
 
-      // Rotación secundaria: orientar cara ancha (+Z local) usando la normal
-      // de las caras adyacentes al strut (más precisa que outward).
+      // Rotación secundaria: cara ancha hacia exterior (face normal)
+      // + offset hubless: desplazar beamT/2 hacia interior
       const ek = edgeKey(strut.v1, strut.v2);
       const faceN = edgeFaceNormal.get(ek);
-      const outwardRef = faceN ?? mid.clone().normalize(); // fallback al método anterior
+      const outwardRef = faceN ?? midEff.clone().normalize();
 
       const proj = outwardRef.clone().projectOnVector(dir);
       const outwardPerp = outwardRef.clone().sub(proj);
@@ -468,22 +488,20 @@ export default function DomeViewer({
           const q2 = new THREE.Quaternion().setFromUnitVectors(currentZ, outwardPerp);
           beam.quaternion.premultiply(q2);
         }
-        // Hubless offset: desplazar la barra hacia el interior del domo
-        // para que la cara exterior quede a nivel de la superficie esférica.
-        beam.position.addScaledVector(outwardPerp, -beamT / 2);
+        // Hubless offset
+        beam.position.addScaledVector(outwardPerp, -ht);
       }
 
       group.add(beam);
     }
 
-    // Grid at base.
+    // ── 9. Grid + cámara ──────────────────────────────────────────────────────
     const gridSize = radius * 3;
-    const grid = new THREE.GridHelper(gridSize, 10, 0x2a2d38, 0x2a2d38);
+    const grid = new THREE.GridHelper(gridSize, 10, 0x1a2a1a, 0x1a2a1a);
     grid.position.y = isFinite(minY) ? minY : 0;
     grid.userData.isGrid = true;
     s.scene.add(grid);
 
-    // Camera + lights + control limits sized to current radius.
     const R = radius;
     s.camera.position.set(R * 1.4, R * 0.7, R * 1.6);
     s.camera.near = Math.max(0.01, R / 1000);
