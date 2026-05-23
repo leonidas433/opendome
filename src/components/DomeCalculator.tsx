@@ -76,6 +76,8 @@ export default function DomeCalculator() {
           <DomeViewer
             vertices={result.vertices}
             struts={result.struts}
+            faces={result.faces}
+            nodeCuts={result.nodeCuts}
             radius={config.radius}
             beamWidth={config.beamWidth}
             beamThickness={config.beamThickness}
