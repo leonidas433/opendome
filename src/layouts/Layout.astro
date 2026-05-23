@@ -9,8 +9,8 @@ interface Props {
 }
 
 const {
-  title = 'Calculador Domo Geodésico — Ángulos exactos de ingletadora',
-  description = 'Calculador geodésico 2V 3V 4V con ángulos exactos de sierra para construcción en madera. Sistema GoodKarma. Método Kruschke.',
+  title = 'OpenDome — Calculador Domo Geodésico | bosqhabitat.es',
+  description = 'Calculador gratuito de domos geodésicos 2V · 3V · 4V. Ángulos exactos de ingletadora y sierra de mesa para construcción en madera. Por bosqhabitat.es.',
 } = Astro.props;
 ---
 
@@ -32,19 +32,39 @@ const {
     <nav class="site-nav">
       <div style="max-width:72rem;margin:0 auto;padding:0 1.25rem;
                   display:flex;align-items:center;justify-content:space-between;height:3.25rem;">
-        <a href="/" style="font-family:var(--font-display);color:var(--accent);
-                           font-size:1.375rem;text-decoration:none;letter-spacing:-0.02em;">
-          Acidome
+
+        <!-- Logo -->
+        <a href="/" style="text-decoration:none;display:flex;align-items:baseline;gap:0.5rem;">
+          <span style="font-family:var(--font-display);color:var(--accent);
+                       font-size:1.375rem;letter-spacing:-0.02em;">
+            OpenDome
+          </span>
+          <span style="font-size:var(--text-caption);color:var(--text-muted);
+                       font-family:var(--font-body);">
+            beta
+          </span>
         </a>
-        <div style="display:flex;gap:1rem;align-items:center;">
-          <a href="https://bosqhabitat.es" target="_blank" rel="noopener"
-             style="font-size:0.8125rem;color:var(--text-muted);text-decoration:none;
-                    transition:color 0.18s ease;"
-             onmouseover="this.style.color='var(--text-secondary)'"
-             onmouseout="this.style.color='var(--text-muted)'">
-            bosqhabitat.es
-          </a>
-        </div>
+
+        <!-- Enlace a bosqhabitat.es -->
+        <a href="https://bosqhabitat.es"
+           target="_blank"
+           rel="noopener"
+           style="display:flex;align-items:center;gap:0.4rem;text-decoration:none;
+                  font-size:0.8125rem;font-family:var(--font-body);
+                  color:var(--text-muted);transition:color 0.18s ease;"
+           onmouseover="this.style.color='var(--accent)'"
+           onmouseout="this.style.color='var(--text-muted)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                  stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="9 22 9 12 15 12 15 22"
+                      stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          bosqhabitat.es
+        </a>
+
       </div>
     </nav>
 
@@ -54,12 +74,24 @@ const {
     </main>
 
     <!-- FOOTER -->
-    <footer style="border-top:1px solid var(--glass-border);
-                   padding:1.5rem 1.25rem;text-align:center;">
-      <p style="font-size:var(--text-caption);color:var(--text-muted);margin:0;">
-        Geometría sobre esfera unidad, escalada al radio físico.
-        Longitudes redondeadas al milímetro · ángulos a una décima de grado.
-      </p>
+    <footer style="border-top:1px solid var(--glass-border);padding:1.5rem 1.25rem;">
+      <div style="max-width:72rem;margin:0 auto;
+                  display:flex;flex-wrap:wrap;align-items:center;
+                  justify-content:space-between;gap:0.75rem;">
+        <p style="font-size:var(--text-caption);color:var(--text-muted);margin:0;">
+          Geometría sobre esfera unidad · longitudes al milímetro · ángulos a 0,1°
+        </p>
+        <a href="https://bosqhabitat.es"
+           target="_blank"
+           rel="noopener"
+           style="font-size:var(--text-caption);color:var(--text-muted);
+                  text-decoration:none;font-family:var(--font-body);
+                  transition:color 0.18s ease;"
+           onmouseover="this.style.color='var(--accent)'"
+           onmouseout="this.style.color='var(--text-muted)'">
+          Una herramienta de bosqhabitat.es →
+        </a>
+      </div>
     </footer>
 
     <!-- BACK TO TOP -->
