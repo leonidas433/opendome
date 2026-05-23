@@ -1,0 +1,369 @@
+@import "tailwindcss";
+
+/* =====================================================
+   ACIDOME — Design System v2
+   dark-first · emerald · construcción ecológica
+   ===================================================== */
+
+:root {
+  /* Base */
+  --bg-primary:    #090d0a;
+  --bg-secondary:  #0f1510;
+  --bg-elevated:   #161d17;
+
+  /* Glass */
+  --glass-bg:      rgba(255, 255, 255, 0.04);
+  --glass-border:  rgba(255, 255, 255, 0.07);
+  --glass-blur:    14px;
+
+  /* Texto */
+  --text-primary:  #edf2ed;
+  --text-secondary:#8fa88f;
+  --text-muted:    #4a5e4a;
+
+  /* Acento — emerald (sostenibilidad / bosqhabitat) */
+  --accent:        #10b981;
+  --accent-dim:    color-mix(in srgb, #10b981 14%, transparent);
+  --accent-glow:   0 0 22px color-mix(in srgb, #10b981 32%, transparent);
+
+  /* Acento de acción — naranja para CTAs de alta urgencia */
+  --action:        #f97316;
+  --action-dim:    color-mix(in srgb, #f97316 12%, transparent);
+
+  /* Cards */
+  --card-bg:       #111a12;
+  --card-border:   rgba(16, 185, 129, 0.10);
+  --card-border-hover: rgba(16, 185, 129, 0.28);
+
+  /* Colores por tipo de listón (espejo de strutColors.ts) */
+  --strut-a:       #10b981;
+  --strut-b:       #f59e0b;
+  --strut-c:       #8b5cf6;
+  --strut-d:       #06b6d4;
+  --strut-e:       #f43f5e;
+
+  /* Semáforo */
+  --ok:            #10b981;
+  --warn:          #f59e0b;
+  --error:         #ef4444;
+
+  /* Tipografía fluida */
+  --text-display:  clamp(2.25rem, 5vw + 1rem, 4.5rem);
+  --text-hero-sub: clamp(1rem, 1.6vw, 1.25rem);
+  --text-body:     clamp(0.9375rem, 1.1vw, 1.0625rem);
+  --text-caption:  clamp(0.6875rem, 0.85vw, 0.8125rem);
+
+  /* Fuentes */
+  --font-display:  'Boldonse', serif;
+  --font-body:     'Work Sans', sans-serif;
+  --font-mono:     'DM Mono', monospace;
+
+  /* Radios */
+  --radius-sm:     8px;
+  --radius-md:     12px;
+  --radius-lg:     20px;
+  --radius-full:   9999px;
+
+  /* Sombras */
+  --shadow-card:     0 4px 24px -8px rgba(0, 0, 0, 0.5);
+  --shadow-elevated: 0 8px 40px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* === Base === */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  color-scheme: dark;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body { margin: 0; }
+
+h1, h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Valores numéricos técnicos: ángulos, longitudes, métricas */
+.mono, .angle-value, .length-value {
+  font-family: var(--font-mono);
+}
+
+/* === View Transitions (navegación Astro) === */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: vt-out 0.18s ease; }
+::view-transition-new(root) { animation: vt-in  0.22s ease; }
+@keyframes vt-out { to   { opacity: 0; transform: translateY(-5px); } }
+@keyframes vt-in  { from { opacity: 0; transform: translateY(5px);  } }
+
+/* === Scroll reveal === */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+[data-reveal].revealed { opacity: 1; transform: none; }
+[data-reveal]:nth-child(2) { transition-delay: 0.08s; }
+[data-reveal]:nth-child(3) { transition-delay: 0.16s; }
+[data-reveal]:nth-child(4) { transition-delay: 0.24s; }
+[data-reveal]:nth-child(5) { transition-delay: 0.30s; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  [data-reveal].revealed { transition: none; opacity: 1; transform: none; }
+}
+
+/* === Grain texture (hero) === */
+.grain-overlay { position: relative; }
+.grain-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.32;
+}
+
+/* === Componentes reutilizables === */
+
+/* Glass card */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+.glass-card:hover {
+  border-color: var(--card-border-hover);
+  box-shadow: var(--accent-glow);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Nav glass */
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(9, 13, 10, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* Botón primario */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.375rem;
+  background: var(--accent);
+  color: #050f08;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.btn-primary:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+.btn-primary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Botón fantasma */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.125rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.875rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+.btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* KPI card */
+.kpi-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+}
+.kpi-value {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: var(--accent);
+  line-height: 1.1;
+}
+.kpi-label {
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+.kpi-hint {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+/* Pill selector (frecuencia, método) */
+.pill-group {
+  display: flex;
+  gap: 0.375rem;
+}
+.pill-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.pill-btn:hover {
+  border-color: var(--accent-dim);
+  color: var(--text-primary);
+}
+.pill-btn[aria-pressed="true"],
+.pill-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #050f08;
+}
+
+/* Input técnico */
+.tech-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  -moz-appearance: textfield;
+}
+.tech-input::-webkit-outer-spin-button,
+.tech-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tech-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--accent-glow);
+}
+
+/* Strut badge pill */
+.strut-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.625rem;
+  min-width: 1.625rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  font-family: var(--font-body);
+  border: 1.5px solid currentColor;
+}
+
+/* Strut card (reemplaza filas de tabla en StrutList) */
+.strut-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  border-left-width: 3px;
+  padding: 1rem;
+  transition: border-color 0.2s ease;
+}
+.strut-card:hover { border-color: var(--card-border-hover); }
+
+/* Tab de método (Método A / Método B) */
+.method-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--glass-border);
+  gap: 0;
+}
+.method-tab {
+  padding: 0.625rem 1.25rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+  margin-bottom: -1px;
+}
+.method-tab:hover { color: var(--text-secondary); }
+.method-tab[aria-selected="true"],
+.method-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* Producto / visor 3D showcase */
+.dome-glow-wrap {
+  position: relative;
+}
+.dome-glow-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -25%;
+  background: radial-gradient(
+    ellipse 60% 40% at 50% 60%,
+    color-mix(in srgb, var(--accent) 16%, transparent),
+    transparent 70%
+  );
+  z-index: -1;
+  pointer-events: none;
+}
+.dome-viewer-frame {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  filter: drop-shadow(0 32px 64px rgba(0, 0, 0, 0.65));
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 2rem;
+  text-align: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}

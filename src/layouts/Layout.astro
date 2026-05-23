@@ -1,0 +1,112 @@
+---
+// src/layouts/Layout.astro
+import '../styles/global.css';
+import BackToTop from '../components/BackToTop';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Calculador Domo Geodésico — Ángulos exactos de ingletadora',
+  description = 'Calculador geodésico 2V 3V 4V con ángulos exactos de sierra para construcción en madera. Sistema GoodKarma. Método Kruschke.',
+} = Astro.props;
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Boldonse&family=Work+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <title>{title}</title>
+  </head>
+  <body>
+
+    <!-- NAV -->
+    <nav class="site-nav">
+      <div style="max-width:72rem;margin:0 auto;padding:0 1.25rem;
+                  display:flex;align-items:center;justify-content:space-between;height:3.25rem;">
+        <a href="/" style="font-family:var(--font-display);color:var(--accent);
+                           font-size:1.375rem;text-decoration:none;letter-spacing:-0.02em;">
+          Acidome
+        </a>
+        <div style="display:flex;gap:1rem;align-items:center;">
+          <a href="https://bosqhabitat.es" target="_blank" rel="noopener"
+             style="font-size:0.8125rem;color:var(--text-muted);text-decoration:none;
+                    transition:color 0.18s ease;"
+             onmouseover="this.style.color='var(--text-secondary)'"
+             onmouseout="this.style.color='var(--text-muted)'">
+            bosqhabitat.es
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main id="main-content" tabindex="-1" style="max-width:72rem;margin:0 auto;padding:2.5rem 1.25rem 5rem;outline:none;">
+      <slot />
+    </main>
+
+    <!-- FOOTER -->
+    <footer style="border-top:1px solid var(--glass-border);
+                   padding:1.5rem 1.25rem;text-align:center;">
+      <p style="font-size:var(--text-caption);color:var(--text-muted);margin:0;">
+        Geometría sobre esfera unidad, escalada al radio físico.
+        Longitudes redondeadas al milímetro · ángulos a una décima de grado.
+      </p>
+    </footer>
+
+    <!-- BACK TO TOP -->
+    <BackToTop client:load />
+
+    <!-- SCROLL REVEAL -->
+    <script>
+      (function () {
+        const observer = new IntersectionObserver(
+          (entries) =>
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.classList.add('revealed');
+                observer.unobserve(e.target);
+              }
+            }),
+          { threshold: 0.07, rootMargin: '0px 0px -36px 0px' }
+        );
+
+        const seen = new WeakSet<Element>();
+        function scan(root: Document | Element) {
+          const matches: Element[] =
+            root instanceof Element && root.matches('[data-reveal]') ? [root] : [];
+          const found = matches.concat(
+            Array.from(root.querySelectorAll('[data-reveal]'))
+          );
+          found.forEach((el) => {
+            if (seen.has(el)) return;
+            seen.add(el);
+            observer.observe(el);
+          });
+        }
+
+        scan(document);
+
+        // Los elementos [data-reveal] viven dentro de islas React (client:load)
+        // que hidratan después de este script — observamos las inserciones.
+        const mo = new MutationObserver((muts) => {
+          for (const m of muts) {
+            m.addedNodes.forEach((n) => {
+              if (n.nodeType === 1) scan(n as Element);
+            });
+          }
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
+      })();
+    </script>
+
+  </body>
+</html>
