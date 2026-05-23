@@ -60,17 +60,18 @@ function createMiterBeamGeometry(
 
   // 8 vértices: índices 0-3 = extremo top, 4-7 = extremo bot.
   const verts = new Float32Array([
-    // Top end (v2): y = hl ± dTop según Z
-    -ht,  hl - dTop,  -hw,   // 0: top, -X, -Z (retrocede)
-     ht,  hl - dTop,  -hw,   // 1: top, +X, -Z (retrocede)
-     ht,  hl + dTop,   hw,   // 2: top, +X, +Z (avanza)
-    -ht,  hl + dTop,   hw,   // 3: top, -X, +Z (avanza)
+    // Top end (v2): cara exterior (Z=+hw) es el lado CORTO,
+    // cara interior (Z=-hw) es el lado LARGO
+    -ht,  hl + dTop,  -hw,   // 0: top, -X, -Z (largo — cara interior)
+     ht,  hl + dTop,  -hw,   // 1: top, +X, -Z (largo — cara interior)
+     ht,  hl - dTop,   hw,   // 2: top, +X, +Z (corto — cara exterior)
+    -ht,  hl - dTop,   hw,   // 3: top, -X, +Z (corto — cara exterior)
 
-    // Bot end (v1): y = -hl ± dBot según Z (signo opuesto)
-    -ht, -hl + dBot,  -hw,   // 4: bot, -X, -Z (avanza)
-     ht, -hl + dBot,  -hw,   // 5: bot, +X, -Z (avanza)
-     ht, -hl - dBot,   hw,   // 6: bot, +X, +Z (retrocede)
-    -ht, -hl - dBot,   hw,   // 7: bot, -X, +Z (retrocede)
+    // Bot end (v1): mismo criterio, simétrico en Y
+    -ht, -hl - dBot,  -hw,   // 4: bot, -X, -Z (largo — cara interior)
+     ht, -hl - dBot,  -hw,   // 5: bot, +X, -Z (largo — cara interior)
+     ht, -hl + dBot,   hw,   // 6: bot, +X, +Z (corto — cara exterior)
+    -ht, -hl + dBot,   hw,   // 7: bot, -X, +Z (corto — cara exterior)
   ]);
 
   // 12 triángulos (2 por cara). La cara "ancha" es Z (beamW), la "estrecha" X (beamT).
