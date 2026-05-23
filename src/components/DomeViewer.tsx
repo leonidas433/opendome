@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
-import type { Strut, Vertex } from '../lib/geodesic/types';
+import type { Strut, Vertex, Triangle, NodeCut } from '../lib/geodesic/types';
 import { STRUT_COLORS_THREE, STRUT_COLOR_FALLBACK_THREE } from '../constants/strutColors';
 
 interface DomeViewerProps {
   vertices: Vertex[];
   struts: Strut[];
+  faces: Triangle[];      // para normales de cara
+  nodeCuts: NodeCut[];    // para ángulos de inglete por tipo/nudo
   radius: number;
   beamWidth: number;
   beamThickness: number;
@@ -25,6 +27,84 @@ function darkenColor(hex: number, factor: number): number {
   return (r << 16) | (g << 8) | b;
 }
 
+// Beam geometry with real miter cuts at each end. Replaces BoxGeometry:
+// 8 vertices (4 per end), 12 triangles (2 per face × 6 faces). The miter
+// shifts the end vertices along the beam's local Y axis by
+// Δ = (beamW / 2) · tan(miter). The shift is symmetric on Z so the cut
+// "opens" outward from the node. Each end has its own miter angle.
+//
+// Local frame: thickness on X, length on Y, width on Z. Material groups
+// match the order used by the `mats` array below:
+//   group 0 → +X narrow, 1 → -X narrow, 2 → top end, 3 → bot end,
+//   group 4 → +Z wide,   5 → -Z wide.
+function createMiterBeamGeometry(
+  len: number,
+  beamW: number,
+  beamT: number,
+  miterTop: number,   // grados — extremo v2 (top en local frame)
+  miterBot: number,   // grados — extremo v1 (bottom en local frame)
+  THREE: typeof import('three')
+): import('three').BufferGeometry {
+  const geo = new THREE.BufferGeometry();
+
+  const hw = beamW / 2; // half-width
+  const ht = beamT / 2; // half-thickness
+  const hl = len / 2;   // half-length
+
+  const mTopRad = (miterTop * Math.PI) / 180;
+  const mBotRad = (miterBot * Math.PI) / 180;
+
+  // Desplazamiento en Y por inglete (los cortes se "abren" hacia afuera del nudo).
+  const dTop = hw * Math.tan(mTopRad);
+  const dBot = hw * Math.tan(mBotRad);
+
+  // 8 vértices: índices 0-3 = extremo top, 4-7 = extremo bot.
+  const verts = new Float32Array([
+    // Top end (v2): y = hl ± dTop según Z
+    -ht,  hl - dTop,  -hw,   // 0: top, -X, -Z (retrocede)
+     ht,  hl - dTop,  -hw,   // 1: top, +X, -Z (retrocede)
+     ht,  hl + dTop,   hw,   // 2: top, +X, +Z (avanza)
+    -ht,  hl + dTop,   hw,   // 3: top, -X, +Z (avanza)
+
+    // Bot end (v1): y = -hl ± dBot según Z (signo opuesto)
+    -ht, -hl + dBot,  -hw,   // 4: bot, -X, -Z (avanza)
+     ht, -hl + dBot,  -hw,   // 5: bot, +X, -Z (avanza)
+     ht, -hl - dBot,   hw,   // 6: bot, +X, +Z (retrocede)
+    -ht, -hl - dBot,   hw,   // 7: bot, -X, +Z (retrocede)
+  ]);
+
+  // 12 triángulos (2 por cara). La cara "ancha" es Z (beamW), la "estrecha" X (beamT).
+  const indices = new Uint16Array([
+    // +X narrow (grupo 0)
+    1, 5, 6,   1, 6, 2,
+    // -X narrow (grupo 1)
+    4, 0, 3,   4, 3, 7,
+    // Top end (grupo 2)
+    0, 1, 2,   0, 2, 3,
+    // Bot end (grupo 3)
+    5, 4, 7,   5, 7, 6,
+    // +Z wide (grupo 4)
+    3, 2, 6,   3, 6, 7,
+    // -Z wide (grupo 5)
+    1, 0, 4,   1, 4, 5,
+  ]);
+
+  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+  geo.setIndex(new THREE.BufferAttribute(indices, 1));
+
+  // Grupos de material (2 triángulos = 6 índices por grupo).
+  geo.addGroup(0,  6, 0);   // +X narrow
+  geo.addGroup(6,  6, 1);   // -X narrow
+  geo.addGroup(12, 6, 2);   // top end
+  geo.addGroup(18, 6, 3);   // bot end
+  geo.addGroup(24, 6, 4);   // +Z wide
+  geo.addGroup(30, 6, 5);   // -Z wide
+
+  geo.computeVertexNormals();
+
+  return geo;
+}
+
 interface OrbitControlsLike {
   update(): void;
   dispose(): void;
@@ -43,6 +123,8 @@ interface OrbitControlsLike {
 export default function DomeViewer({
   vertices,
   struts,
+  faces,
+  nodeCuts,
   radius,
   beamWidth,
   beamThickness,
@@ -194,7 +276,7 @@ export default function DomeViewer({
   useEffect(() => {
     buildGeometry();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vertices, struts, radius, beamWidth, beamThickness]);
+  }, [vertices, struts, faces, nodeCuts, radius, beamWidth, beamThickness]);
 
   function buildGeometry() {
     const s = stateRef.current;
@@ -229,8 +311,6 @@ export default function DomeViewer({
         }
       }
     }
-    // Confirm group is still a child of scene (it is; cleanup only popped its
-    // children, never scene.remove(group)).
 
     // Clear grid (we re-add it sized to current radius).
     const toRemove: import('three').Object3D[] = [];
@@ -258,8 +338,69 @@ export default function DomeViewer({
       if (p.y < minY) minY = p.y;
     }
 
-    // 2) Per-type material cache: store the FULL 6-element array so the
-    //    Mesh receives it directly, in canonical BoxGeometry face order.
+    // Lookup de ángulo de inglete por (strutType, nodeType). El nodeType se
+    // deriva de la valencia igual que en el motor (cutAngles.ts), así que las
+    // claves casan con las que generó computeDome.
+    function nodeTypeFromValence(valence: number): string {
+      if (valence === 5) return 'pentagonal';
+      if (valence === 6) return 'hexagonal';
+      return `boundary-${valence}`;
+    }
+
+    const cutMap = new Map<string, number>(); // key → miter en GRADOS
+    for (const cut of nodeCuts) {
+      const key = `${cut.strutType}_${cut.nodeType}`;
+      if (!cutMap.has(key)) cutMap.set(key, cut.miter);
+    }
+
+    function getMiter(strutType: string, valence: number): number {
+      const key = `${strutType}_${nodeTypeFromValence(valence)}`;
+      return cutMap.get(key) ?? 0;
+    }
+
+    // Normal de cara promedio por arista (en espacio Three.js, tras toV3).
+    // Reemplaza la aproximación outward = mid.normalize() en la rotación
+    // secundaria por la normal real de las caras adyacentes al strut.
+    function edgeKey(a: number, b: number): string {
+      return a < b ? `${a}-${b}` : `${b}-${a}`;
+    }
+
+    const faceNormalAccum = new Map<string, import('three').Vector3>();
+
+    for (const [a, b, c] of faces) {
+      const pA = positions[a];
+      const pB = positions[b];
+      const pC = positions[c];
+      if (!pA || !pB || !pC) continue;
+
+      // Normal de la cara en espacio Three.js.
+      const ab = pB.clone().sub(pA);
+      const ac = pC.clone().sub(pA);
+      const n = new THREE.Vector3().crossVectors(ab, ac).normalize();
+
+      // Asegurar que apunta hacia fuera (dot con centroide > 0).
+      const centroid = pA.clone().add(pB).add(pC).multiplyScalar(1 / 3);
+      if (n.dot(centroid) < 0) n.negate();
+
+      // Acumular para las 3 aristas de la cara.
+      for (const [u, v] of [[a, b], [b, c], [c, a]] as [number, number][]) {
+        const k = edgeKey(u, v);
+        const existing = faceNormalAccum.get(k);
+        if (existing) {
+          existing.add(n);
+        } else {
+          faceNormalAccum.set(k, n.clone());
+        }
+      }
+    }
+
+    const edgeFaceNormal = new Map<string, import('three').Vector3>();
+    for (const [k, acc] of faceNormalAccum) {
+      edgeFaceNormal.set(k, acc.normalize());
+    }
+
+    // Per-type material cache: store the FULL 6-element array so the Mesh
+    // receives it directly, in the face order used by createMiterBeamGeometry.
     const matCache = new Map<string, import('three').MeshPhongMaterial[]>();
     const yAxis = new THREE.Vector3(0, 1, 0);
 
@@ -276,12 +417,14 @@ export default function DomeViewer({
       const mid = p1.clone().add(p2).multiplyScalar(0.5);
       const dir = p2.clone().sub(p1).normalize();
 
-      // 3) Geometry: thickness on X, length on Y, width on Z.
-      //    BoxGeometry face order is +X, -X, +Y, -Y, +Z, -Z.
-      const geo = new THREE.BoxGeometry(beamT, len, beamW);
+      // Ángulos de inglete en cada extremo.
+      const miterBot = getMiter(strut.type, v1.valence); // extremo v1 (bottom)
+      const miterTop = getMiter(strut.type, v2.valence); // extremo v2 (top)
 
-      // 4) Materials. Cached per type; the cached value IS the 6-array,
-      //    so Mesh receives it directly (not a single Material).
+      // Geometría con cortes reales.
+      const geo = createMiterBeamGeometry(len, beamW, beamT, miterTop, miterBot, THREE);
+
+      // Materiales (mismo sistema que antes).
       let mats = matCache.get(strut.type);
       if (!mats) {
         const hex = STRUT_COLORS_THREE[strut.type] ?? STRUT_COLOR_FALLBACK_THREE;
@@ -290,29 +433,33 @@ export default function DomeViewer({
           color: darkenColor(hex, 0.4),
           shininess: 10,
         });
-        const matEnd = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 5 });
+        const matEnd = new THREE.MeshPhongMaterial({ color: 0x0d1a0f, shininess: 5 });
+        // Orden: [+X narrow, -X narrow, top end, bot end, +Z wide, -Z wide]
         mats = [matNarrow, matNarrow, matEnd, matEnd, matWide, matWide];
         matCache.set(strut.type, mats);
       }
 
-      // 5) Build mesh, then position & rotate (NOT applyMatrix4 on geometry).
       const beam = new THREE.Mesh(geo, mats);
       beam.position.copy(mid);
 
-      // Primary rotation: align beam Y-axis with strut direction.
-      // setFromUnitVectors fails when vectors are antiparallel — handle that.
+      // Rotación primaria: alinear eje Y local con dirección del strut.
+      // setFromUnitVectors falla si los vectores son antiparalelos — se trata.
       const dotDir = dir.dot(yAxis);
       if (Math.abs(dotDir) < 0.999) {
         beam.quaternion.setFromUnitVectors(yAxis, dir);
       } else if (dotDir < 0) {
         beam.rotation.z = Math.PI;
       }
-      // (else: dir parallel to +Y, identity rotation — leave quaternion alone)
 
-      // Secondary rotation: orient wide face (Z) outward from dome center.
-      const outward = mid.clone().normalize();
-      const proj = outward.clone().projectOnVector(dir);
-      const outwardPerp = outward.clone().sub(proj);
+      // Rotación secundaria: orientar cara ancha (+Z local) usando la normal
+      // de las caras adyacentes al strut (más precisa que outward).
+      const ek = edgeKey(strut.v1, strut.v2);
+      const faceN = edgeFaceNormal.get(ek);
+      const outwardRef = faceN ?? mid.clone().normalize(); // fallback al método anterior
+
+      const proj = outwardRef.clone().projectOnVector(dir);
+      const outwardPerp = outwardRef.clone().sub(proj);
+
       if (outwardPerp.length() > 0.001) {
         outwardPerp.normalize();
         const currentZ = new THREE.Vector3(0, 0, 1).applyQuaternion(beam.quaternion);
@@ -333,8 +480,6 @@ export default function DomeViewer({
     s.scene.add(grid);
 
     // Camera + lights + control limits sized to current radius.
-    // Position pulled in (~R·2.2 distance vs the previous R·3) so the
-    // beam cross-section is more obvious on first paint.
     const R = radius;
     s.camera.position.set(R * 1.4, R * 0.7, R * 1.6);
     s.camera.near = Math.max(0.01, R / 1000);
