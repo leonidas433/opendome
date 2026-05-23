@@ -20,6 +20,48 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
+
+    <!-- Canonical -->
+    <link rel="canonical" href={new URL(Astro.url.pathname, 'https://domo.bosqhabitat.es').toString()} />
+
+    <!-- Open Graph -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:title"       content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url"         content={new URL(Astro.url.pathname, 'https://domo.bosqhabitat.es').toString()} />
+    <meta property="og:image"       content="https://domo.bosqhabitat.es/og-image.png" />
+    <meta property="og:locale"      content="es_ES" />
+    <meta property="og:site_name"   content="OpenDome" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image"       content="https://domo.bosqhabitat.es/og-image.png" />
+
+    <!-- Schema.org -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "OpenDome",
+      "description": description,
+      "url": "https://domo.bosqhabitat.es",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "es",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "bosqhabitat",
+        "url": "https://bosqhabitat.es"
+      }
+    })} />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,7 +90,7 @@ const {
         <!-- Enlace a bosqhabitat.es -->
         <a href="https://bosqhabitat.es"
            target="_blank"
-           rel="noopener"
+           rel="noopener noreferrer"
            style="display:flex;align-items:center;gap:0.4rem;text-decoration:none;
                   font-size:0.8125rem;font-family:var(--font-body);
                   color:var(--text-muted);transition:color 0.18s ease;"
@@ -83,7 +125,7 @@ const {
         </p>
         <a href="https://bosqhabitat.es"
            target="_blank"
-           rel="noopener"
+           rel="noopener noreferrer"
            style="font-size:var(--text-caption);color:var(--text-muted);
                   text-decoration:none;font-family:var(--font-body);
                   transition:color 0.18s ease;"
