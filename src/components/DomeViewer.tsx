@@ -468,6 +468,9 @@ export default function DomeViewer({
           const q2 = new THREE.Quaternion().setFromUnitVectors(currentZ, outwardPerp);
           beam.quaternion.premultiply(q2);
         }
+        // Hubless offset: desplazar la barra hacia el interior del domo
+        // para que la cara exterior quede a nivel de la superficie esférica.
+        beam.position.addScaledVector(outwardPerp, -beamT / 2);
       }
 
       group.add(beam);
