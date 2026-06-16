@@ -37,6 +37,18 @@ export interface NodeCut {
   quantity: number;
 }
 
+export interface StrutEndCut {
+  node: string; // 'pentagonal' | 'hexagonal' | `boundary-${valence}`
+  miter: number; // grados, SIN redondear
+  bevel: number; // grados, SIN redondear
+}
+
+export interface StrutCut {
+  strutId: number;
+  cut1: StrutEndCut; // extremo en v1
+  cut2: StrutEndCut; // extremo en v2
+}
+
 export interface TriangleFaceType {
   id: string;
   strutTypes: [string, string, string];
@@ -66,6 +78,7 @@ export interface DomeResult {
   faces: Triangle[];
   strutTypes: StrutTypeSummary[];
   nodeCuts: NodeCut[];
+  strutCuts: StrutCut[];
   triangleTypes: TriangleFaceType[];
   totalBeams: number;
   coverArea: number;

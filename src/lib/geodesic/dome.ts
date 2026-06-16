@@ -359,6 +359,7 @@ export function computeDome(config: DomeConfig): DomeResult {
     faces: filteredFaces,
     strutTypes,
     nodeCuts,
+    strutCuts: cuts.strutCuts,
     triangleTypes,
     totalBeams: filteredStruts.length,
     coverArea,
