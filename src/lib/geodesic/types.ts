@@ -46,7 +46,7 @@ export interface TriangleFaceType {
 }
 
 export type Frequency = 2 | 3 | 4;
-export type PartialDome = '1/2' | '3/8' | '5/8' | '7/12';
+export type PartialDome = '1/2' | '3/8' | '5/8' | '7/12' | '1/1';
 export type DomeMethod = 'kruschke' | 'chord';
 
 export interface DomeConfig {

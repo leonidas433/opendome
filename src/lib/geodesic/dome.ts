@@ -31,6 +31,8 @@ function partialCutoff(partial: PartialDome): number {
       return lowerRing - 1e-6; // keep through middle band
     case '7/12':
       return -1 / 6; // ≈ -0.1667, slightly below hemisphere
+    case '1/1':
+      return -1.1; // full sphere (mismo valor que default, a propósito)
     default:
       return -1.1; // full sphere
   }
@@ -304,7 +306,7 @@ export function computeDome(config: DomeConfig): DomeResult {
 
   // Geometry stats
   const heightUnit = 1 - cutoff;
-  const height = heightUnit * radiusM;
+  const height = config.partial === '1/1' ? 2 * radiusM : heightUnit * radiusM;
 
   // Base ring: vertices at the lowest z (within tolerance) of the filtered
   // mesh. baseRadius from polygon: max horizontal radius among them.
