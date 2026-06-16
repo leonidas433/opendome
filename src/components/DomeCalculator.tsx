@@ -65,54 +65,61 @@ export default function DomeCalculator() {
   const sortedCuts = sortNodeCuts(result.nodeCuts);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="calc-layout">
 
-      {/* ZONA 1 — INPUTS (primero, patrón F) */}
-      <InputPanel config={config} onChange={setConfig} />
+      {/* ZONA 1 — INPUTS (sticky a la izquierda en escritorio) */}
+      <div className="calc-aside">
+        <InputPanel config={config} onChange={setConfig} />
+      </div>
 
-      {/* ZONA 2 — VISOR 3D (feedback inmediato tras configurar) */}
-      <div className="dome-glow-wrap" data-reveal>
-        <div className="dome-viewer-frame">
-          <DomeViewer
-            vertices={result.vertices}
-            struts={result.struts}
-            faces={result.faces}
-            nodeCuts={result.nodeCuts}
-            radius={config.radius}
+      {/* ZONAS 2–6 — Resultados (columna derecha en escritorio) */}
+      <div className="calc-main">
+
+        {/* ZONA 2 — VISOR 3D (feedback inmediato tras configurar) */}
+        <div className="dome-glow-wrap" data-reveal>
+          <div className="dome-viewer-frame">
+            <DomeViewer
+              vertices={result.vertices}
+              struts={result.struts}
+              faces={result.faces}
+              nodeCuts={result.nodeCuts}
+              radius={config.radius}
+              beamWidth={config.beamWidth}
+              beamThickness={config.beamThickness}
+            />
+          </div>
+        </div>
+
+        {/* ZONA 3 — KPIs / Datos constructivos */}
+        <div data-reveal>
+          <BaseStats result={result} config={config} />
+        </div>
+
+        {/* ZONA 4 — Lista de barras (plano de corte) */}
+        <div data-reveal>
+          <StrutList result={result} />
+        </div>
+
+        {/* ZONA 5 — Diagramas de sierra */}
+        <div data-reveal>
+          <SierraAngulos
+            nodeCuts={sortedCuts}
+            strutTypes={result.strutTypes}
             beamWidth={config.beamWidth}
             beamThickness={config.beamThickness}
           />
         </div>
-      </div>
 
-      {/* ZONA 3 — KPIs / Datos constructivos */}
-      <div data-reveal>
-        <BaseStats result={result} config={config} />
-      </div>
+        {/* ZONA 6 — Triángulos ensamblados (avanzado, al final) */}
+        <div data-reveal>
+          <TriangleViewer
+            triangleTypes={result.triangleTypes}
+            beamWidth={config.beamWidth}
+            beamThickness={config.beamThickness}
+            strutColors={STRUT_COLORS_HEX}
+          />
+        </div>
 
-      {/* ZONA 4 — Lista de barras (plano de corte) */}
-      <div data-reveal>
-        <StrutList result={result} />
-      </div>
-
-      {/* ZONA 5 — Diagramas de sierra */}
-      <div data-reveal>
-        <SierraAngulos
-          nodeCuts={sortedCuts}
-          strutTypes={result.strutTypes}
-          beamWidth={config.beamWidth}
-          beamThickness={config.beamThickness}
-        />
-      </div>
-
-      {/* ZONA 6 — Triángulos ensamblados (avanzado, al final) */}
-      <div data-reveal>
-        <TriangleViewer
-          triangleTypes={result.triangleTypes}
-          beamWidth={config.beamWidth}
-          beamThickness={config.beamThickness}
-          strutColors={STRUT_COLORS_HEX}
-        />
       </div>
 
     </div>

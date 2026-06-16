@@ -367,3 +367,27 @@ h1, h2 {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
 }
+
+/* Layout calculadora: 1 columna en móvil, 2 en escritorio */
+.calc-layout {
+  display: grid;
+  grid-template-columns: 1fr;   /* móvil: una columna */
+  gap: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .calc-layout {
+    grid-template-columns: minmax(320px, 380px) 1fr;  /* aside + resultados */
+    align-items: start;
+  }
+  .calc-aside {
+    position: sticky;
+    top: calc(3.25rem + 1rem);   /* alto nav + respiro; ajusta si la nav cambió */
+    align-self: start;
+  }
+}
+.calc-main {
+  min-width: 0;        /* CLAVE: evita que el visor 3D desborde la columna */
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
