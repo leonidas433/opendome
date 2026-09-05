@@ -30,3 +30,9 @@ pnpm-debug.log*
 dev.log
 .waylog/
 .specstory/
+
+# local tooling (indexes, editor, sync, dumps)
+.codegraph/
+.cursor/
+.stfolder/
+repomix-output.xml

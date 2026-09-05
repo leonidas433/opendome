@@ -122,10 +122,10 @@ export default function StrutDrawing3D({
   }
   const padX = 70;
   const padTop = 50;
-  // Extra bottom space for the cross-section orientation indicator.
-  const padBottom = 130;
+  // vbW is horizontal-only (independent of the cota); vbH is derived further
+  // down, once the real length-cota position is known, to stack the bottom
+  // bands without overlap.
   const vbW = maxX - minX + padX * 2;
-  const vbH = maxY - minY + padTop + padBottom;
   const ox = -minX + padX;
   const oy = -minY + padTop;
 
@@ -152,6 +152,34 @@ export default function StrutDrawing3D({
 
   // Thickness cota: on the front face left edge.
   const thickCotaX = tl.x - 18;
+
+  // --- Bottom band layout ----------------------------------------------------
+  // Three stacked bands share the lower canvas: (1) length cota, (2) section
+  // orientation box, (3) bottom caption. They used unrelated references (cota
+  // vs. canvas bottom) and overlapped. Derive the section inset and the canvas
+  // height from the real cota position so the bands never collide.
+  //
+  // Cross-section box size (used to render the inset AND to size vbH).
+  const sectMaxW = 70;
+  const sectMaxH = 30;
+  const sectRatio = beamThickness / Math.max(beamWidth, 1);
+  const sW = sectMaxW;
+  const sH = Math.max(8, Math.min(sectMaxH, sectMaxW * sectRatio));
+  // Section inset internal vertical offsets (shared with the render below).
+  const sectBoxDy = 22; // box top below insetTop
+  const sectTableGap = 4; // gap from box bottom to the table line
+  const sectMesaDy = 12; // MESA baseline below the table line
+  // Bottom of the length-cota text in viewBox coords (baseline + descender).
+  const cotaTextBottom = oy + cotaY + 16 + 4;
+  // Section box starts a clear margin below the cota.
+  const sectionGap = 18;
+  const insetTop = cotaTextBottom + sectionGap;
+  // Lowest section element is the MESA label under the table line.
+  const sectionBlockBottom =
+    insetTop + sectBoxDy + sH + sectTableGap + sectMesaDy + 4;
+  // Canvas height: leave room for the bottom caption (drawn at vbH - 12).
+  const captionGap = 18;
+  const vbH = sectionBlockBottom + captionGap + 12;
 
   return (
     <svg
@@ -334,15 +362,11 @@ export default function StrutDrawing3D({
           Shows the beam end-on with the wide face down against the table. */}
       {(() => {
         const insetX = 18;
-        const insetTop = vbH - 110;
-        const sectMaxW = 70;
-        const sectMaxH = 30;
-        const ratio = beamThickness / Math.max(beamWidth, 1);
-        const sW = sectMaxW;
-        const sH = Math.max(8, Math.min(sectMaxH, sectMaxW * ratio));
+        // insetTop, sW, sH and the section vertical offsets are derived above
+        // from the real cota position (see "Bottom band layout").
         const sectX = insetX + 8;
-        const sectY = insetTop + 22;
-        const tableY = sectY + sH + 4;
+        const sectY = insetTop + sectBoxDy;
+        const tableY = sectY + sH + sectTableGap;
 
         return (
           <g>
@@ -412,7 +436,7 @@ export default function StrutDrawing3D({
             />
             <text
               x={(sectX + sW / 2).toFixed(2)}
-              y={(tableY + 12).toFixed(2)}
+              y={(tableY + sectMesaDy).toFixed(2)}
               textAnchor="middle"
               fontSize="9"
               fontWeight="600"
